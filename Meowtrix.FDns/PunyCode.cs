@@ -50,9 +50,6 @@ namespace Meowtrix.FDns
                 }
             }
 
-            if (h == totalRunes)
-                return true;
-
             if (asciiBuffer.BytesConsumed > 0)
             {
                 if (!asciiBuffer.TryAdd(Delimiter))

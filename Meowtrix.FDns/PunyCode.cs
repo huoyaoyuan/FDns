@@ -87,12 +87,12 @@ namespace Meowtrix.FDns
 
                         if (!asciiBuffer.TryAdd(GetDigitChar(q)))
                             return false;
-                    }
 
-                    bias = AdaptBias(delta, h + 1, firstTime);
-                    firstTime = false;
-                    delta = 0;
-                    h++;
+                        bias = AdaptBias(delta, h + 1, firstTime);
+                        firstTime = false;
+                        delta = 0;
+                        h++;
+                    }
                 }
 
                 delta++;

@@ -29,7 +29,7 @@ namespace Meowtrix.FDns
             return k + (Base - TMin + 1) * delta / (delta + Skew);
         }
 
-        private static bool TryEncodeCore(ReadOnlySpan<char> chars, ref ValueBuffer<byte> asciiBuffer)
+        private static OperationStatus TryEncodeCore(ReadOnlySpan<char> chars, ref ValueBuffer<byte> asciiBuffer)
         {
             int n = InitialN;
             int delta = 0;
@@ -46,14 +46,14 @@ namespace Meowtrix.FDns
                     h++;
 
                     if (!asciiBuffer.TryAdd((byte)c.Value))
-                        return false;
+                        return OperationStatus.DestinationTooSmall;
                 }
             }
 
             if (asciiBuffer.BytesConsumed > 0)
             {
                 if (!asciiBuffer.TryAdd(Delimiter))
-                    return false;
+                    return OperationStatus.DestinationTooSmall;
             }
 
             bool firstTime = true;
@@ -67,7 +67,17 @@ namespace Meowtrix.FDns
                 }
 
                 Debug.Assert(m < int.MaxValue);
-                delta += (m - n) * (h + 1);
+                try
+                {
+                    checked
+                    {
+                        delta += (m - n) * (h + 1);
+                    }
+                }
+                catch (OverflowException)
+                {
+                    return OperationStatus.InvalidData;
+                }
                 n = m;
 
                 foreach (Rune c in chars.EnumerateRunes())
@@ -75,7 +85,11 @@ namespace Meowtrix.FDns
                     static byte GetDigitChar(int digit, bool upperCase) => (byte)(digit <= 25 ? (upperCase ? 'A' : 'a') + digit : '0' + digit - 26);
 
                     if (c.Value < n)
+                    {
+                        if (delta == int.MaxValue)
+                            return OperationStatus.InvalidData;
                         delta++;
+                    }
 
                     if (c.Value == n)
                     {
@@ -87,13 +101,13 @@ namespace Meowtrix.FDns
                                 break;
 
                             if (!asciiBuffer.TryAdd(GetDigitChar(t + (q - t) % (Base - t), Rune.IsUpper(c))))
-                                return false;
+                                return OperationStatus.DestinationTooSmall;
 
                             q = (q - t) / (Base - t);
                         }
 
                         if (!asciiBuffer.TryAdd(GetDigitChar(q, Rune.IsUpper(c))))
-                            return false;
+                            return OperationStatus.DestinationTooSmall;
 
                         bias = AdaptBias(delta, h + 1, firstTime);
                         firstTime = false;
@@ -106,15 +120,15 @@ namespace Meowtrix.FDns
                 n++;
             }
 
-            return true;
+            return OperationStatus.Done;
         }
 
         public static OperationStatus TryEncodeToAscii(ReadOnlySpan<char> chars, Span<byte> asciiBuffer, out int bytesWritten)
         {
             var buffer = new ValueBuffer<byte>(asciiBuffer, false);
-            bool result = TryEncodeCore(chars, ref buffer);
+            var result = TryEncodeCore(chars, ref buffer);
             bytesWritten = buffer.BytesConsumed;
-            return result ? OperationStatus.Done : OperationStatus.DestinationTooSmall;
+            return result;
         }
 
         public static OperationStatus TryEncodeToUtf16(ReadOnlySpan<char> chars, Span<char> utf16Buffer, out int bytesWritten)
@@ -122,25 +136,33 @@ namespace Meowtrix.FDns
             Span<byte> asciiBuffer = stackalloc byte[utf16Buffer.Length];
 
             var buffer = new ValueBuffer<byte>(asciiBuffer, false);
-            bool result = TryEncodeCore(chars, ref buffer);
+            var result = TryEncodeCore(chars, ref buffer);
             bytesWritten = buffer.BytesConsumed;
 
             Encoding.ASCII.GetChars(buffer.ConsumedSpan, utf16Buffer);
-            return result ? OperationStatus.Done : OperationStatus.DestinationTooSmall;
+            return result;
         }
 
         public static int EncodeToAscii(ReadOnlySpan<char> chars, Span<byte> asciiBuffer)
         {
-            if (TryEncodeToAscii(chars, asciiBuffer, out int bytesWritten) == OperationStatus.Done)
-                return bytesWritten;
-            throw new ArgumentException("Destination too small", nameof(asciiBuffer));
+            return TryEncodeToAscii(chars, asciiBuffer, out int bytesWritten) switch
+            {
+                OperationStatus.Done => bytesWritten,
+                OperationStatus.InvalidData => throw new OverflowException("The input can't be represented by PunyCode"),
+                OperationStatus.DestinationTooSmall => throw new ArgumentException("Destination too small", nameof(asciiBuffer)),
+                _ => throw new InvalidOperationException("unreachable")
+            };
         }
 
         public static int EncodeToUtf16(ReadOnlySpan<char> chars, Span<char> utf16Buffer)
         {
-            if (TryEncodeToUtf16(chars, utf16Buffer, out int bytesWritten) == OperationStatus.Done)
-                return bytesWritten;
-            throw new ArgumentException("Destination too small", nameof(utf16Buffer));
+            return TryEncodeToUtf16(chars, utf16Buffer, out int bytesWritten) switch
+            {
+                OperationStatus.Done => bytesWritten,
+                OperationStatus.InvalidData => throw new OverflowException("The input can't be represented by PunyCode"),
+                OperationStatus.DestinationTooSmall => throw new ArgumentException("Destination too small", nameof(utf16Buffer)),
+                _ => throw new InvalidOperationException("unreachable")
+            };
         }
 
         public static string EncodeToString(ReadOnlySpan<char> chars)
@@ -148,8 +170,12 @@ namespace Meowtrix.FDns
             var buffer = new ValueBuffer<byte>(stackalloc byte[63], true);
             try
             {
-                bool result = TryEncodeCore(chars, ref buffer);
-                Debug.Assert(result);
+                var result = TryEncodeCore(chars, ref buffer);
+                if (result != OperationStatus.Done)
+                {
+                    Debug.Assert(result == OperationStatus.InvalidData);
+                    throw new OverflowException("The input can't be represented by PunyCode");
+                }
                 return Encoding.ASCII.GetString(buffer.ConsumedSpan);
             }
             finally

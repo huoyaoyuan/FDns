@@ -3,7 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31808.319
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meowtrix.FDns", "Meowtrix.FDns\Meowtrix.FDns.csproj", "{F04D4C87-7D9F-49E8-AD14-39C8D175B44E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Meowtrix.FDns", "Meowtrix.FDns\Meowtrix.FDns.csproj", "{F04D4C87-7D9F-49E8-AD14-39C8D175B44E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9E4B4855-F5B3-4EF6-98AE-9E2781646D4C}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -18,6 +18,13 @@ namespace Meowtrix.FDns.UnitTests
 
                 // Chinese (simplified)
                 yield return new object[] { "\u4ED6\u4EEC\u4E3A\u4EC0\u4E48\u4E0D\u8BF4\u4E2D\u6587", "ihqwcrb4cv8a8dqg056pqjye" };
+
+                // Chinese (traditional)
+                yield return new object[] { "\u4ED6\u5011\u7232\u4EC0\u9EBD\u4E0D\u8AAA\u4E2D\u6587", "ihqwctvzc91f659drss3x8bo0yb" };
+
+                // Czech
+                yield return new object[] { "\u0050\u0072\u006F\u010D\u0070\u0072\u006F\u0073\u0074\u011B\u006E\u0065\u006D\u006C\u0075\u0076\u00ED\u010D\u0065\u0073\u006B\u0079", "Proprostnemluvesky-uyb24dma41a" };
+
             }
         }
 

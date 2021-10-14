@@ -14,6 +14,7 @@ namespace Meowtrix.FDns
         private const int Damp = 700;
         private const int InitialBias = 72;
         private const int InitialN = 0x80;
+        private const byte Delimiter = (byte)'-';
 
         private static int AdaptBias(int delta, int numPoints, bool firstTime)
         {
@@ -47,6 +48,15 @@ namespace Meowtrix.FDns
                     if (!asciiBuffer.TryAdd((byte)c.Value))
                         return false;
                 }
+            }
+
+            if (h == totalRunes)
+                return true;
+
+            if (asciiBuffer.BytesConsumed > 0)
+            {
+                if (!asciiBuffer.TryAdd(Delimiter))
+                    return false;
             }
 
             bool firstTime = true;

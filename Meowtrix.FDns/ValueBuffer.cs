@@ -52,7 +52,7 @@ namespace Meowtrix.FDns
             if (_buffer == default && !_canRent)
                 throw new ObjectDisposedException(nameof(ValueBuffer<T>));
 
-            if (!HasMoreSpace)
+            if (BytesConsumed >= _buffer.Length)
             {
                 if (!_canRent)
                     return false;

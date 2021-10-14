@@ -28,10 +28,8 @@ namespace Meowtrix.FDns
             return k + (Base - TMin + 1) * delta / (delta + Skew);
         }
 
-        public static OperationStatus TryEncodeToAscii(ReadOnlySpan<char> chars, Span<byte> asciiBuffer, out int bytesWritten)
+        private static bool TryEncodeCore(ReadOnlySpan<char> chars, ref ValueBuffer<byte> asciiBuffer)
         {
-            bytesWritten = 0;
-
             int n = InitialN;
             int delta = 0;
             int bias = InitialBias;
@@ -46,9 +44,8 @@ namespace Meowtrix.FDns
                 {
                     h++;
 
-                    if (bytesWritten >= asciiBuffer.Length)
-                        return OperationStatus.DestinationTooSmall;
-                    asciiBuffer[bytesWritten++] = (byte)c.Value;
+                    if (!asciiBuffer.TryAdd((byte)c.Value))
+                        return false;
                 }
             }
 
@@ -82,16 +79,14 @@ namespace Meowtrix.FDns
                             if (q < t)
                                 break;
 
-                            if (bytesWritten >= asciiBuffer.Length)
-                                return OperationStatus.DestinationTooSmall;
-                            asciiBuffer[bytesWritten++] = GetDigitChar(t + (q - t) % (Base - t));
+                            if (!asciiBuffer.TryAdd(GetDigitChar(t + (q - t) % (Base - t))))
+                                return false;
 
                             q = (q - t) / (Base - t);
                         }
 
-                        if (bytesWritten >= asciiBuffer.Length)
-                            return OperationStatus.DestinationTooSmall;
-                        asciiBuffer[bytesWritten++] = GetDigitChar(q);
+                        if (!asciiBuffer.TryAdd(GetDigitChar(q)))
+                            return false;
                     }
 
                     bias = AdaptBias(delta, h + 1, firstTime);
@@ -104,18 +99,27 @@ namespace Meowtrix.FDns
                 n++;
             }
 
-            return OperationStatus.Done;
+            return true;
+        }
+
+        public static OperationStatus TryEncodeToAscii(ReadOnlySpan<char> chars, Span<byte> asciiBuffer, out int bytesWritten)
+        {
+            var buffer = new ValueBuffer<byte>(asciiBuffer, false);
+            bool result = TryEncodeCore(chars, ref buffer);
+            bytesWritten = buffer.BytesConsumed;
+            return result ? OperationStatus.Done : OperationStatus.DestinationTooSmall;
         }
 
         public static OperationStatus TryEncodeToUtf16(ReadOnlySpan<char> chars, Span<char> utf16Buffer, out int bytesWritten)
         {
             Span<byte> asciiBuffer = stackalloc byte[utf16Buffer.Length];
-            var result = TryEncodeToAscii(chars, asciiBuffer, out bytesWritten);
 
-            for (int i = 0; i < asciiBuffer.Length; i++)
-                utf16Buffer[i] = (char)asciiBuffer[i];
+            var buffer = new ValueBuffer<byte>(asciiBuffer, false);
+            bool result = TryEncodeCore(chars, ref buffer);
+            bytesWritten = buffer.BytesConsumed;
 
-            return result;
+            Encoding.ASCII.GetChars(buffer.ConsumedSpan, utf16Buffer);
+            return result ? OperationStatus.Done : OperationStatus.DestinationTooSmall;
         }
 
         public static int EncodeToAscii(ReadOnlySpan<char> chars, Span<byte> asciiBuffer)
@@ -130,6 +134,21 @@ namespace Meowtrix.FDns
             if (TryEncodeToUtf16(chars, utf16Buffer, out int bytesWritten) == OperationStatus.Done)
                 return bytesWritten;
             throw new ArgumentException("Destination too small", nameof(utf16Buffer));
+        }
+
+        public static string EncodeToString(ReadOnlySpan<char> chars)
+        {
+            var buffer = new ValueBuffer<byte>(stackalloc byte[63], true);
+            try
+            {
+                bool result = TryEncodeCore(chars, ref buffer);
+                Debug.Assert(result);
+                return Encoding.ASCII.GetString(buffer.ConsumedSpan);
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
     }
 }

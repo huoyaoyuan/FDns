@@ -75,7 +75,7 @@ namespace Meowtrix.FDns
 
                 foreach (Rune c in chars.EnumerateRunes())
                 {
-                    static byte GetDigitChar(int digit) => (byte)(digit <= 25 ? 'a' + digit : '0' + digit - 26);
+                    static byte GetDigitChar(int digit, bool upperCase) => (byte)(digit <= 25 ? (upperCase ? 'A' : 'a') + digit : '0' + digit - 26);
 
                     if (c.Value < n)
                         delta++;
@@ -89,13 +89,13 @@ namespace Meowtrix.FDns
                             if (q < t)
                                 break;
 
-                            if (!asciiBuffer.TryAdd(GetDigitChar(t + (q - t) % (Base - t))))
+                            if (!asciiBuffer.TryAdd(GetDigitChar(t + (q - t) % (Base - t), Rune.IsUpper(c))))
                                 return false;
 
                             q = (q - t) / (Base - t);
                         }
 
-                        if (!asciiBuffer.TryAdd(GetDigitChar(q)))
+                        if (!asciiBuffer.TryAdd(GetDigitChar(q, Rune.IsUpper(c))))
                             return false;
 
                         bias = AdaptBias(delta, h + 1, firstTime);

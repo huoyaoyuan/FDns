@@ -62,7 +62,7 @@ namespace Meowtrix.FDns.UnitTests
         [MemberData(nameof(TestData))]
         public void TestEncoding(string raw, string expected)
         {
-            Assert.Equal(expected, PunyCode.EncodeToString(raw));
+            Assert.Equal(expected, PunyCode.EncodeToString(raw), ignoreCase: true);
         }
     }
 }

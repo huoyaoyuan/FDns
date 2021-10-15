@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Buffers;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Meowtrix.FDns.UnitTests
@@ -59,6 +61,23 @@ namespace Meowtrix.FDns.UnitTests
         public void TestEncoding(string raw, string expected)
         {
             Assert.Equal(expected, PunyCode.EncodeToString(raw), ignoreCase: true);
+        }
+
+        [Theory]
+        [MemberData(nameof(TestData))]
+        public void TestDecoding(string raw, string encoded)
+        {
+            Assert.Equal(raw, PunyCode.DecodeToString(encoded));
+        }
+
+        [Theory]
+        [InlineData("\xFE\xFF")]
+        [InlineData("-=")]
+        public void TestInvalidData(string encoded)
+        {
+            Span<char> destination = stackalloc char[16];
+            var result = PunyCode.TryDecodeFromUtf16(encoded, destination, out _);
+            Assert.Equal(OperationStatus.InvalidData, result);
         }
     }
 }

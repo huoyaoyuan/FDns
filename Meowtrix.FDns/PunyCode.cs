@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Meowtrix.FDns
 {
     public static class PunyCode
     {
+        // https://datatracker.ietf.org/doc/html/rfc3492
+
         private const int Base = 36;
         private const int TMin = 1;
         private const int TMax = 26;
@@ -177,6 +180,175 @@ namespace Meowtrix.FDns
                     throw new OverflowException("The input can't be represented by PunyCode");
                 }
                 return Encoding.ASCII.GetString(buffer.ConsumedSpan);
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        private static OperationStatus TryDecodeCore(ReadOnlySpan<byte> ascii, ref ValueBuffer<Rune> runeBuffer)
+        {
+            int n = InitialN;
+            int i = 0;
+            int bias = InitialBias;
+
+            for (int j = ascii.Length - 1; j >= 0; j--)
+            {
+                if (ascii[j] == Delimiter)
+                {
+                    foreach (byte b in ascii[..j])
+                        if (!runeBuffer.TryAdd(new Rune(b)))
+                            return OperationStatus.DestinationTooSmall;
+
+                    ascii = ascii[(j + 1)..];
+                    break;
+                }
+            }
+
+            while (!ascii.IsEmpty)
+            {
+                int oldi = i;
+                int w = 1;
+                for (int k = Base; true; k += Base)
+                {
+                    if (ascii.IsEmpty)
+                        return OperationStatus.NeedMoreData;
+
+                    char c = (char)ascii[0];
+                    ascii = ascii[1..];
+                    int digit = c switch
+                    {
+                        >= 'a' and <= 'z' => c - 'a',
+                        >= 'A' and <= 'Z' => c - 'A',
+                        >= '0' and <= '9' => c - '0' + 26,
+                        _ => -1
+                    };
+                    if (digit == -1)
+                        return OperationStatus.InvalidData;
+
+                    try
+                    {
+                        checked
+                        {
+                            i += digit * w;
+                        }
+                    }
+                    catch (OverflowException)
+                    {
+                        return OperationStatus.InvalidData;
+                    }
+
+                    int t = Math.Clamp(k - bias, TMin, TMax);
+                    if (digit < t)
+                        break;
+
+                    try
+                    {
+                        checked
+                        {
+                            w *= Base - t;
+                        }
+                    }
+                    catch (OverflowException)
+                    {
+                        return OperationStatus.InvalidData;
+                    }
+                }
+
+                bias = AdaptBias(i - oldi, runeBuffer.BytesConsumed + 1, oldi == 0);
+
+                try
+                {
+                    checked
+                    {
+                        n += i / (runeBuffer.BytesConsumed + 1);
+                    }
+                }
+                catch (OverflowException)
+                {
+                    return OperationStatus.InvalidData;
+                }
+
+                i %= runeBuffer.BytesConsumed + 1;
+
+                var rune = new Rune(n);
+                if (rune.IsAscii)
+                    return OperationStatus.InvalidData;
+                if (!runeBuffer.TryInsert(rune, i))
+                    return OperationStatus.DestinationTooSmall;
+
+                i++;
+            }
+
+            return OperationStatus.Done;
+        }
+
+        public static OperationStatus TryDecodeFromAscii(ReadOnlySpan<byte> ascii, Span<char> utf16Buffer, out int charsWritten)
+        {
+            var buffer = new ValueBuffer<Rune>(stackalloc Rune[utf16Buffer.Length], false);
+            var result = TryDecodeCore(ascii, ref buffer);
+            var utf32 = MemoryMarshal.AsBytes(buffer.ConsumedSpan);
+
+            if (Encoding.UTF32.GetCharCount(utf32) > utf16Buffer.Length)
+            {
+                charsWritten = 0;
+                return OperationStatus.DestinationTooSmall;
+            }
+
+            charsWritten = Encoding.UTF32.GetChars(utf32, utf16Buffer);
+            return result;
+        }
+
+        public static OperationStatus TryDecodeFromUtf16(ReadOnlySpan<char> utf16, Span<char> utf16Buffer, out int charsWritten)
+        {
+            Span<byte> ascii = stackalloc byte[utf16.Length];
+            int asciiByttes = Encoding.ASCII.GetBytes(utf16, ascii);
+            Debug.Assert(asciiByttes == ascii.Length);
+            return TryDecodeFromAscii(ascii, utf16Buffer, out charsWritten);
+        }
+
+        public static int DecodeFromAscii(ReadOnlySpan<byte> ascii, Span<char> utf16Buffer)
+        {
+            return TryDecodeFromAscii(ascii, utf16Buffer, out int charsWritten) switch
+            {
+                OperationStatus.Done => charsWritten,
+                OperationStatus.InvalidData => throw new ArgumentException("The input is not valid PunyCode", nameof(ascii)),
+                OperationStatus.NeedMoreData => throw new ArgumentException("The input is not complete PunyCode", nameof(ascii)),
+                OperationStatus.DestinationTooSmall => throw new ArgumentException("Destination too small", nameof(utf16Buffer)),
+                _ => throw new InvalidOperationException("unreachable")
+            };
+        }
+
+        public static int DecodeFromUtf16(ReadOnlySpan<char> utf16, Span<char> utf16Buffer)
+        {
+            return TryDecodeFromUtf16(utf16, utf16Buffer, out int charsWritten) switch
+            {
+                OperationStatus.Done => charsWritten,
+                OperationStatus.InvalidData => throw new ArgumentException("The input is not valid PunyCode", nameof(utf16)),
+                OperationStatus.NeedMoreData => throw new ArgumentException("The input is not complete PunyCode", nameof(utf16)),
+                OperationStatus.DestinationTooSmall => throw new ArgumentException("Destination too small", nameof(utf16Buffer)),
+                _ => throw new InvalidOperationException("unreachable")
+            };
+        }
+
+        public static string DecodeToString(ReadOnlySpan<char> utf16)
+        {
+            Span<byte> ascii = stackalloc byte[utf16.Length];
+            int asciiByttes = Encoding.ASCII.GetBytes(utf16, ascii);
+            Debug.Assert(asciiByttes == ascii.Length);
+
+            var buffer = new ValueBuffer<Rune>(stackalloc Rune[utf16.Length], true);
+            try
+            {
+
+                var result = TryDecodeCore(ascii, ref buffer);
+                if (result != OperationStatus.Done)
+                {
+                    Debug.Assert(result == OperationStatus.InvalidData);
+                    throw new OverflowException("The input can't be represented by PunyCode");
+                }
+                return Encoding.UTF32.GetString(MemoryMarshal.AsBytes(buffer.ConsumedSpan));
             }
             finally
             {

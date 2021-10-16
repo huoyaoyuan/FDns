@@ -2,7 +2,7 @@
 {
     // https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.4
 
-    public enum DnsRecordClass : short
+    public enum DnsEndpointClass : short
     {
         /// <summary>
         /// The Internet

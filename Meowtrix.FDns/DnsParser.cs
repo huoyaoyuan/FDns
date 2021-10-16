@@ -6,7 +6,7 @@ using Meowtrix.FDns.Records;
 
 namespace Meowtrix.FDns
 {
-    internal static class DnsParser
+    public static class DnsParser
     {
         public static ReadOnlySpan<byte> IDNAPrefix
             => new byte[] { (byte)'x', (byte)'n', (byte)'-', (byte)'-' };
@@ -56,7 +56,7 @@ namespace Meowtrix.FDns
                     position = position + 1 + length;
                 }
 
-                return new string(buffer);
+                return new string(buffer[..bufferIndex]);
             }
 
             bytesConsumed = 12;

@@ -6,7 +6,7 @@ namespace Meowtrix.FDns
     public record class DnsMessage
     {
         public short QueryId { get; set; }
-        public bool IsQuery { get; set; }
+        public bool IsResponse { get; set; }
         public DnsOperation Operation { get; set; }
         public bool IsAuthoritativeAnswer { get; set; }
         public bool IsTruncated { get; set; }

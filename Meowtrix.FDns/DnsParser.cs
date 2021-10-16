@@ -11,7 +11,7 @@ namespace Meowtrix.FDns
         public static ReadOnlySpan<byte> IDNAPrefix
             => new byte[] { (byte)'x', (byte)'n', (byte)'-', (byte)'-' };
 
-        private const ushort QueryFlag = 0b_1000_0000_0000_0000;
+        private const ushort ResponseFlag = 0b_1000_0000_0000_0000;
         private const ushort OpCodeMask = 0b_0111_1000_0000_0000;
         private const int OpCodeShift = 11;
         private const ushort AuthoritativeMask = 0b_0000_0100_0000_0000;
@@ -71,7 +71,7 @@ namespace Meowtrix.FDns
             int serverCount = BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
             int additionalCount = BinaryPrimitives.ReadUInt16BigEndian(span[10..]);
 
-            message.IsQuery = (flags & QueryFlag) != 0;
+            message.IsResponse = (flags & ResponseFlag) != 0;
             message.Operation = (DnsOperation)((flags & OpCodeMask) >> OpCodeShift);
             message.IsAuthoritativeAnswer = (flags & AuthoritativeMask) != 0;
             message.IsTruncated = (flags & TruncationMask) != 0;
@@ -186,8 +186,8 @@ namespace Meowtrix.FDns
             BinaryPrimitives.WriteInt16BigEndian(destination, message.QueryId);
 
             ushort flags = 0;
-            if (message.IsQuery)
-                flags |= QueryFlag;
+            if (message.IsResponse)
+                flags |= ResponseFlag;
             flags |= (ushort)((ushort)message.Operation << OpCodeShift);
             if (message.IsAuthoritativeAnswer)
                 flags |= AuthoritativeMask;

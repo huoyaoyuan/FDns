@@ -36,6 +36,7 @@ namespace Meowtrix.FDns
                     {
                         position = length & 0b_0011_1111;
                         jumped = true;
+                        bytesConsumed++;
                         continue;
                     }
 

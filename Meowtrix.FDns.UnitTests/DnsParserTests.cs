@@ -75,5 +75,46 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Equal(DomainType.A, message.Queries[0].QueryType);
             Assert.Equal(DnsEndpointClass.IN, message.Queries[0].QueryClass);
         }
+
+        [Fact]
+        public void NamePointer()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+                1, (byte)'a', 2, (byte)'b', (byte) 'c', 0,
+                0, 1, 0, 1,
+                0b_1100_0000 + 14,
+                0, 1, 0, 1,
+                7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
+                3, (byte)'c', (byte)'o', (byte)'m', 0,
+                0, 1, 0, 1,
+            };
+            var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
+            Assert.Equal(packet.Length, bytesConsumed);
+
+            Assert.Equal(3, message.Queries.Count);
+            Assert.Equal("a.bc", message.Queries[0].QueryName);
+            Assert.Equal("bc", message.Queries[1].QueryName);
+            Assert.Equal("example.com", message.Queries[2].QueryName);
+        }
+
+        [Fact]
+        public void UnicodeDomainName()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                17, (byte)'x', (byte)'n', (byte) '-', (byte)'-', (byte)'r', (byte)'h', (byte)'q', (byte)'r', (byte)'3', (byte)'y',
+                (byte)'k', (byte)'w', (byte)'b', (byte)'x', (byte)'v', (byte)'0', (byte)'c',
+                3, (byte)'t', (byte)'o', (byte)'p', 0,
+                0, 1, 0, 1,
+            };
+            var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
+            Assert.Equal(packet.Length, bytesConsumed);
+
+            Assert.Equal(1, message.Queries.Count);
+            Assert.Equal("世界大学.top", message.Queries[0].QueryName);
+        }
     }
 }

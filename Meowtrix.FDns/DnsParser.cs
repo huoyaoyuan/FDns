@@ -96,6 +96,8 @@ namespace Meowtrix.FDns
 
                     record = qtype switch
                     {
+                        DomainType.A or DomainType.AAAA => new IPRecord(),
+                        DomainType.TXT => new TxtRecord(),
                         _ => new UnknownRecord()
                     };
                     record.Name = name;

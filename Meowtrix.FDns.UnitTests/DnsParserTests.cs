@@ -8,6 +8,14 @@ namespace Meowtrix.FDns.UnitTests
 {
     public class DnsParserTests
     {
+        private static void TestFormatRoundTrip(byte[] packet, DnsMessage message)
+        {
+            byte[] buffer = new byte[packet.Length];
+            int bytesWritten = DnsParser.FormatMessage(message, buffer);
+            Assert.Equal(buffer.Length, bytesWritten);
+            Assert.Equal(packet, buffer);
+        }
+
         [Fact]
         public void EmptyMessage()
         {
@@ -23,6 +31,8 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Null(message.Answers);
             Assert.Null(message.NameServerAuthorities);
             Assert.Null(message.AdditionalRecords);
+
+            TestFormatRoundTrip(packet, message);
         }
 
         [Fact]
@@ -30,17 +40,19 @@ namespace Meowtrix.FDns.UnitTests
         {
             byte[] packet = new byte[]
             {
-                0, 0, 0b_0000_1010, 0b1000_0101, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0b_0000_1000, 0b1000_0101, 0, 0, 0, 0, 0, 0, 0, 0,
             };
             var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
             Assert.Equal(packet.Length, bytesConsumed);
             Assert.False(message.IsResponse);
             Assert.Equal(DnsOperation.InverseQuery, message.Operation);
             Assert.False(message.IsAuthoritativeAnswer);
-            Assert.True(message.IsTruncated);
+            Assert.False(message.IsTruncated);
             Assert.False(message.IsRecursionDesired);
             Assert.True(message.IsRecursionAvailable);
             Assert.Equal(DnsResponseCode.Refused, message.ResponseCode);
+
+            TestFormatRoundTrip(packet, message);
         }
 
         public static IEnumerable<object[]> IncompletePacketData
@@ -76,6 +88,8 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Equal("a.bc", message.Queries[0].QueryName);
             Assert.Equal(DomainType.A, message.Queries[0].QueryType);
             Assert.Equal(DnsEndpointClass.IN, message.Queries[0].QueryClass);
+
+            TestFormatRoundTrip(packet, message);
         }
 
         [Fact]
@@ -99,6 +113,8 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Equal("a.bc", message.Queries[0].QueryName);
             Assert.Equal("bc", message.Queries[1].QueryName);
             Assert.Equal("example.com", message.Queries[2].QueryName);
+
+            // No round-trip test for compressed name
         }
 
         [Fact]
@@ -117,6 +133,8 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.Equal(1, message.Queries.Count);
             Assert.Equal("世界大学.top", message.Queries[0].QueryName);
+
+            TestFormatRoundTrip(packet, message);
         }
 
         [Fact]
@@ -141,6 +159,8 @@ namespace Meowtrix.FDns.UnitTests
             var record = Assert.IsType<IPRecord>(message.Answers[0]);
             Assert.Equal(AddressFamily.InterNetwork, record.Address.AddressFamily);
             Assert.Equal("93.184.216.34", record.Address.ToString());
+
+            TestFormatRoundTrip(packet, message);
         }
 
         [Fact]
@@ -166,6 +186,8 @@ namespace Meowtrix.FDns.UnitTests
             var record = Assert.IsType<IPRecord>(message.Answers[0]);
             Assert.Equal(AddressFamily.InterNetworkV6, record.Address.AddressFamily);
             Assert.Equal("2606:2800:220:1:248:1893:25c8:1946", record.Address.ToString());
+
+            TestFormatRoundTrip(packet, message);
         }
 
         [Fact]
@@ -190,6 +212,8 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<TxtRecord>(message.Answers[0]);
             Assert.Equal("Hello, world!", record.Text);
+
+            TestFormatRoundTrip(packet, message);
         }
     }
 }

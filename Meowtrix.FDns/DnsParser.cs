@@ -139,9 +139,9 @@ namespace Meowtrix.FDns
                 {
                     int delimiterIndex = name.IndexOf('.');
                     ReadOnlySpan<char> section;
-                    if (delimiterIndex == -1)
+                    if (delimiterIndex != -1)
                     {
-                        section = name[delimiterIndex..];
+                        section = name[..delimiterIndex];
                         name = name[(delimiterIndex + 1)..];
                     }
                     else
@@ -165,17 +165,18 @@ namespace Meowtrix.FDns
 
                     if (isAscii)
                     {
-                        int bytesWritten = Encoding.ASCII.GetBytes(section, destination);
-                        destination = destination[bytesWritten..];
-                        totalBytesWritten += bytesWritten;
+                        int bytesWritten = Encoding.ASCII.GetBytes(section, destination[1..]);
+                        destination[0] = checked((byte)bytesWritten);
+                        destination = destination[(bytesWritten + 1)..];
+                        totalBytesWritten += bytesWritten + 1;
                     }
                     else
                     {
-                        IDNAPrefix.CopyTo(destination);
-                        destination = destination[IDNAPrefix.Length..];
-                        int bytesWritten = PunyCode.EncodeToAscii(section, destination);
-                        destination = destination[bytesWritten..];
-                        totalBytesWritten += bytesWritten + IDNAPrefix.Length;
+                        IDNAPrefix.CopyTo(destination[1..]);
+                        int bytesWritten = PunyCode.EncodeToAscii(section, destination[(IDNAPrefix.Length + 1)..]);
+                        destination[0] = checked((byte)(bytesWritten + IDNAPrefix.Length));
+                        destination = destination[(bytesWritten + IDNAPrefix.Length + 1)..];
+                        totalBytesWritten += bytesWritten + IDNAPrefix.Length + 1;
                     }
                 }
 

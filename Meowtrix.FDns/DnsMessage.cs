@@ -49,7 +49,7 @@ namespace Meowtrix.FDns
         public DnsEndpointClass EndpointClass { get; set; }
         public int AliveSeconds { get; set; }
 
-        public abstract void ReadData(ReadOnlySpan<byte> data);
-        public abstract int WriteData(Span<byte> destination);
+        internal abstract void ReadData(ref DnsParser.DnsParseContext context, int length);
+        internal abstract int WriteData(ref DnsParser.DnsFormatContext context);
     }
 }

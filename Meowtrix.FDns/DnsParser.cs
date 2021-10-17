@@ -67,8 +67,8 @@ namespace Meowtrix.FDns
                     record.Type = qtype;
                     record.EndpointClass = qclass;
                     record.AliveSeconds = ttl;
-                    record.ReadData(context.AvailableSpan[..rdlength]);
-                    context.BytesConsumed += rdlength;
+
+                    record.ReadData(ref context, rdlength);
                 }
 
                 return result;
@@ -128,9 +128,10 @@ namespace Meowtrix.FDns
                     context.WriteUInt16((ushort)record.Type);
                     context.WriteUInt16((ushort)record.EndpointClass);
                     context.WriteInt32(record.AliveSeconds);
-                    int dataLength = record.WriteData(context.AvailableSpan[2..]);
-                    context.WriteUInt16(checked((ushort)dataLength));
-                    context.BytesWritten += dataLength;
+                    var lengthSpan = context.AvailableSpan;
+                    context.BytesWritten += 2;
+                    int dataLength = record.WriteData(ref context);
+                    BinaryPrimitives.WriteUInt16BigEndian(lengthSpan, checked((ushort)dataLength));
                 }
             }
 

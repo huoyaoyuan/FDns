@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Meowtrix.FDns.Records
 {
-    public class TxtRecord : DnsResourceRecord
+    public class TxtRecord : NormalRecord
     {
         public string? Text { get; set; }
 

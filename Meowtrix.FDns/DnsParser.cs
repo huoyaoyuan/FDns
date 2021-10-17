@@ -94,85 +94,7 @@ namespace Meowtrix.FDns
 
         public static int FormatMessage(DnsMessage message, Span<byte> destination, bool enableNameCompression = false)
         {
-            List<(int Index, string String)>? savedString = null;
-            if (enableNameCompression)
-                savedString = new();
-
-            int FormatName(ReadOnlySpan<char> name, Span<byte> destination, int startIndex)
-            {
-                int totalBytesWritten = 0;
-                while (!name.IsEmpty)
-                {
-                    if (savedString != null)
-                    {
-                        // Compression
-                        foreach (var (index, saved) in savedString)
-                        {
-                            if (name.SequenceEqual(saved))
-                            {
-                                Debug.Assert(index <= 0b_0011_1111);
-
-                                destination[0] = checked((byte)(0b_1100_0000 | index));
-                                return totalBytesWritten + 1;
-                            }
-                        }
-
-                        // Save for compression
-                        int current = startIndex + totalBytesWritten;
-                        if (current <= 0b_0011_1111)
-                        {
-                            savedString.Add((current, name.ToString()));
-                        }
-                    }
-
-                    int delimiterIndex = name.IndexOf('.');
-                    ReadOnlySpan<char> section;
-                    if (delimiterIndex != -1)
-                    {
-                        section = name[..delimiterIndex];
-                        name = name[(delimiterIndex + 1)..];
-                    }
-                    else
-                    {
-                        section = name;
-                        name = default;
-                    }
-
-                    if (section.IsEmpty)
-                        throw new FormatException("Invalid domain name.");
-
-                    bool isAscii = true;
-                    foreach (char c in section)
-                    {
-                        if (c >= 0x80)
-                        {
-                            isAscii = false;
-                            break;
-                        }
-                    }
-
-                    if (isAscii)
-                    {
-                        int bytesWritten = Encoding.ASCII.GetBytes(section, destination[1..]);
-                        destination[0] = checked((byte)bytesWritten);
-                        destination = destination[(bytesWritten + 1)..];
-                        totalBytesWritten += bytesWritten + 1;
-                    }
-                    else
-                    {
-                        IDNAPrefix.CopyTo(destination[1..]);
-                        int bytesWritten = PunyCode.EncodeToAscii(section, destination[(IDNAPrefix.Length + 1)..]);
-                        destination[0] = checked((byte)(bytesWritten + IDNAPrefix.Length));
-                        destination = destination[(bytesWritten + IDNAPrefix.Length + 1)..];
-                        totalBytesWritten += bytesWritten + IDNAPrefix.Length + 1;
-                    }
-                }
-
-                destination[0] = 0;
-                return totalBytesWritten + 1;
-            }
-
-            BinaryPrimitives.WriteUInt16BigEndian(destination, message.QueryId);
+            var context = new DnsFormatContext(destination, enableNameCompression);
 
             ushort flags = 0;
             if (message.IsResponse)
@@ -187,49 +109,42 @@ namespace Meowtrix.FDns
             if (message.IsRecursionAvailable)
                 flags |= RecursionAvailableMask;
             flags |= (ushort)message.ResponseCode;
-            BinaryPrimitives.WriteUInt16BigEndian(destination[2..], flags);
-            BinaryPrimitives.WriteUInt16BigEndian(destination[4..], checked((ushort)message.Queries.Count));
-            BinaryPrimitives.WriteUInt16BigEndian(destination[6..], checked((ushort)(message.Answers?.Count ?? 0)));
-            BinaryPrimitives.WriteUInt16BigEndian(destination[8..], checked((ushort)(message.NameServerAuthorities?.Count ?? 0)));
-            BinaryPrimitives.WriteUInt16BigEndian(destination[10..], checked((ushort)(message.AdditionalRecords?.Count ?? 0)));
-            int bytesWritten = 12;
 
-            int FormatSection(IReadOnlyList<DnsResourceRecord>? secton, Span<byte> destination, int startIndex)
+            context.WriteUInt16(message.QueryId);
+            context.WriteUInt16(flags);
+            context.WriteUInt16(checked((ushort)message.Queries.Count));
+            context.WriteUInt16(checked((ushort)(message.Answers?.Count ?? 0)));
+            context.WriteUInt16(checked((ushort)(message.NameServerAuthorities?.Count ?? 0)));
+            context.WriteUInt16(checked((ushort)(message.AdditionalRecords?.Count ?? 0)));
+
+            static void FormatSection(IReadOnlyList<DnsResourceRecord>? secton, ref DnsFormatContext context)
             {
                 if (secton is null)
-                    return 0;
-
-                int bytesWritten = 0;
+                    return;
 
                 foreach (var record in secton)
                 {
-                    bytesWritten += FormatName(
-                        record.Name ?? throw new InvalidOperationException("RR must have name"),
-                        destination[bytesWritten..],
-                        startIndex + bytesWritten);
-                    BinaryPrimitives.WriteUInt16BigEndian(destination[bytesWritten..], (ushort)record.Type);
-                    BinaryPrimitives.WriteUInt16BigEndian(destination[(bytesWritten + 2)..], (ushort)record.EndpointClass);
-                    BinaryPrimitives.WriteInt32BigEndian(destination[(bytesWritten + 4)..], record.AliveSeconds);
-                    int dataLength = record.WriteData(destination[(bytesWritten + 10)..]);
-                    BinaryPrimitives.WriteUInt16BigEndian(destination[(bytesWritten + 8)..], checked((ushort)dataLength));
-                    bytesWritten += dataLength + 10;
+                    context.WriteDomainName(record.Name ?? throw new InvalidOperationException("RR must have name"));
+                    context.WriteUInt16((ushort)record.Type);
+                    context.WriteUInt16((ushort)record.EndpointClass);
+                    context.WriteInt32(record.AliveSeconds);
+                    int dataLength = record.WriteData(context.AvailableSpan[2..]);
+                    context.WriteUInt16(checked((ushort)dataLength));
+                    context.BytesWritten += dataLength;
                 }
-
-                return bytesWritten;
             }
 
             foreach (var query in message.Queries)
             {
-                bytesWritten += FormatName(query.QueryName, destination[bytesWritten..], bytesWritten);
-                BinaryPrimitives.WriteUInt16BigEndian(destination[bytesWritten..], (ushort)query.QueryType);
-                BinaryPrimitives.WriteUInt16BigEndian(destination[(bytesWritten + 2)..], (ushort)query.QueryClass);
-                bytesWritten += 4;
+                context.WriteDomainName(query.QueryName);
+                context.WriteUInt16((ushort)query.QueryType);
+                context.WriteUInt16((ushort)query.QueryClass);
             }
 
-            bytesWritten += FormatSection(message.Answers, destination[bytesWritten..], bytesWritten);
-            bytesWritten += FormatSection(message.NameServerAuthorities, destination[bytesWritten..], bytesWritten);
-            bytesWritten += FormatSection(message.AdditionalRecords, destination[bytesWritten..], bytesWritten);
-            return bytesWritten;
+            FormatSection(message.Answers, ref context);
+            FormatSection(message.NameServerAuthorities, ref context);
+            FormatSection(message.AdditionalRecords, ref context);
+            return context.BytesWritten;
         }
 
         internal ref struct DnsParseContext
@@ -296,6 +211,105 @@ namespace Meowtrix.FDns
 
                 BytesConsumed += bytesConsumed;
                 return new string(buffer[..bufferIndex]);
+            }
+        }
+
+        internal ref struct DnsFormatContext
+        {
+            private readonly Span<byte> _span;
+            public int BytesWritten { get; set; }
+            public Span<byte> AvailableSpan => _span[BytesWritten..];
+            private readonly List<(int Index, string String)>? _savedString;
+
+            public DnsFormatContext(Span<byte> span, bool allowNameCompression)
+            {
+                _span = span;
+                BytesWritten = 0;
+                _savedString = allowNameCompression ? new() : null;
+            }
+
+            public void WriteUInt16(ushort value)
+            {
+                BinaryPrimitives.WriteUInt16BigEndian(AvailableSpan, value);
+                BytesWritten += 2;
+            }
+
+            public void WriteInt32(int value)
+            {
+                BinaryPrimitives.WriteInt32BigEndian(AvailableSpan, value);
+                BytesWritten += 4;
+            }
+
+            public void WriteDomainName(ReadOnlySpan<char> name)
+            {
+                while (!name.IsEmpty)
+                {
+                    if (_savedString != null)
+                    {
+                        // Compression
+                        foreach (var (index, saved) in _savedString)
+                        {
+                            if (name.SequenceEqual(saved))
+                            {
+                                Debug.Assert(index <= 0b_0011_1111);
+
+                                AvailableSpan[0] = checked((byte)(0b_1100_0000 | index));
+                                BytesWritten++;
+                                return;
+                            }
+                        }
+
+                        // Save for compression
+                        int current = BytesWritten;
+                        if (current <= 0b_0011_1111)
+                        {
+                            _savedString.Add((current, name.ToString()));
+                        }
+                    }
+
+                    int delimiterIndex = name.IndexOf('.');
+                    ReadOnlySpan<char> section;
+                    if (delimiterIndex != -1)
+                    {
+                        section = name[..delimiterIndex];
+                        name = name[(delimiterIndex + 1)..];
+                    }
+                    else
+                    {
+                        section = name;
+                        name = default;
+                    }
+
+                    if (section.IsEmpty)
+                        throw new FormatException("Invalid domain name.");
+
+                    bool isAscii = true;
+                    foreach (char c in section)
+                    {
+                        if (c >= 0x80)
+                        {
+                            isAscii = false;
+                            break;
+                        }
+                    }
+
+                    if (isAscii)
+                    {
+                        int bytesWritten = Encoding.ASCII.GetBytes(section, AvailableSpan[1..]);
+                        AvailableSpan[0] = checked((byte)bytesWritten);
+                        BytesWritten += bytesWritten + 1;
+                    }
+                    else
+                    {
+                        IDNAPrefix.CopyTo(AvailableSpan[1..]);
+                        int bytesWritten = PunyCode.EncodeToAscii(section, AvailableSpan[(IDNAPrefix.Length + 1)..]);
+                        AvailableSpan[0] = checked((byte)(bytesWritten + IDNAPrefix.Length));
+                        BytesWritten += bytesWritten + IDNAPrefix.Length + 1;
+                    }
+                }
+
+                AvailableSpan[0] = 0;
+                BytesWritten++;
             }
         }
     }

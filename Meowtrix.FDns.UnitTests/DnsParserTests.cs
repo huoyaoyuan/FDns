@@ -238,5 +238,55 @@ namespace Meowtrix.FDns.UnitTests
 
             TestFormatRoundTrip(packet, message);
         }
+
+        [Fact]
+        public void CNameAnswer()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0x80, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
+                3, (byte)'c', (byte)'o', (byte)'m', 0,
+                0, 5, 0, 1, 0, 0, 0x12, 0x34, 0, 17,
+                3, (byte)'w', (byte)'w', (byte)'w',
+                7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
+                3, (byte)'c', (byte)'o', (byte)'m', 0,
+            };
+            var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
+            Assert.Equal(packet.Length, bytesConsumed);
+
+            Assert.True(message.IsResponse);
+            Assert.Equal(1, message.Answers.Count);
+            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
+            Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
+            var record = Assert.IsType<DomainNameRecord>(message.Answers[0]);
+            Assert.Equal("www.example.com", record.TargetDomainName);
+
+            TestFormatRoundTrip(packet, message);
+        }
+
+        [Fact]
+        public void NamePointerInCName()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0x80, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
+                3, (byte)'c', (byte)'o', (byte)'m', 0,
+                0, 5, 0, 1, 0, 0, 0x12, 0x34, 0, 5,
+                3, (byte)'w', (byte)'w', (byte)'w', 0b_1100_0000 + 12,
+            };
+            var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
+            Assert.Equal(packet.Length, bytesConsumed);
+
+            Assert.True(message.IsResponse);
+            Assert.Equal(1, message.Answers.Count);
+            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
+            Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
+            var record = Assert.IsType<DomainNameRecord>(message.Answers[0]);
+            Assert.Equal("www.example.com", record.TargetDomainName);
+        }
     }
 }

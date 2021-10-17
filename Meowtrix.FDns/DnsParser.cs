@@ -61,6 +61,7 @@ namespace Meowtrix.FDns
                     {
                         DomainType.A or DomainType.AAAA => new IPRecord(),
                         DomainType.TXT => new TxtRecord(),
+                        DomainType.CNAME => new DomainNameRecord(),
                         _ => new UnknownRecord()
                     };
                     record.Name = name;

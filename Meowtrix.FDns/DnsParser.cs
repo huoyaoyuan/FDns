@@ -23,54 +23,17 @@ namespace Meowtrix.FDns
 
         public static DnsMessage ParseMessage(ReadOnlySpan<byte> span, out int bytesConsumed)
         {
-            static string ParseName(ReadOnlySpan<byte> span, int position, out int bytesConsumed)
-            {
-                Span<char> buffer = stackalloc char[256];
-                int bufferIndex = 0;
-                bytesConsumed = 0;
-                bool jumped = false;
+            var context = new DnsParseContext(span);
 
-                while (true)
-                {
-                    byte length = span[position];
-                    if ((length & 0b_1100_0000) != 0)
-                    {
-                        position = length & 0b_0011_1111;
-                        jumped = true;
-                        bytesConsumed++;
-                        continue;
-                    }
-
-                    if (!jumped)
-                        bytesConsumed += length + 1;
-
-                    if (length == 0)
-                        break;
-
-                    if (bufferIndex > 0)
-                        buffer[bufferIndex++] = '.';
-
-                    var nameSpan = span.Slice(position + 1, length);
-                    int charsWritten = nameSpan.StartsWith(IDNAPrefix)
-                        ? PunyCode.DecodeFromAscii(nameSpan[IDNAPrefix.Length..], buffer[bufferIndex..])
-                        : Encoding.ASCII.GetChars(nameSpan, buffer[bufferIndex..]);
-                    bufferIndex += charsWritten;
-                    position = position + 1 + length;
-                }
-
-                return new string(buffer[..bufferIndex]);
-            }
-
-            bytesConsumed = 12;
             var message = new DnsMessage
             {
-                QueryId = BinaryPrimitives.ReadInt16BigEndian(span)
+                QueryId = context.ReadUInt16(),
             };
-            ushort flags = BinaryPrimitives.ReadUInt16BigEndian(span[2..]);
-            int queryCount = BinaryPrimitives.ReadUInt16BigEndian(span[4..]);
-            int answerCount = BinaryPrimitives.ReadUInt16BigEndian(span[6..]);
-            int serverCount = BinaryPrimitives.ReadUInt16BigEndian(span[8..]);
-            int additionalCount = BinaryPrimitives.ReadUInt16BigEndian(span[10..]);
+            ushort flags = context.ReadUInt16();
+            int queryCount = context.ReadUInt16();
+            int answerCount = context.ReadUInt16();
+            int serverCount = context.ReadUInt16();
+            int additionalCount = context.ReadUInt16();
 
             message.IsResponse = (flags & ResponseFlag) != 0;
             message.Operation = (DnsOperation)((flags & OpCodeMask) >> OpCodeShift);
@@ -80,7 +43,7 @@ namespace Meowtrix.FDns
             message.IsRecursionAvailable = (flags & RecursionAvailableMask) != 0;
             message.ResponseCode = (DnsResponseCode)(flags & ResponseCodeMask);
 
-            static IReadOnlyList<DnsResourceRecord>? ParseSection(ReadOnlySpan<byte> span, int count, ref int bytesConsumed)
+            static IReadOnlyList<DnsResourceRecord>? ParseSection(ref DnsParseContext context, int count)
             {
                 if (count == 0)
                     return null;
@@ -88,13 +51,11 @@ namespace Meowtrix.FDns
                 var result = new DnsResourceRecord[count];
                 foreach (ref var record in result.AsSpan())
                 {
-                    string name = ParseName(span, bytesConsumed, out int nameConsumed);
-                    bytesConsumed += nameConsumed;
-                    DomainType qtype = (DomainType)BinaryPrimitives.ReadUInt16BigEndian(span[bytesConsumed..]);
-                    DnsEndpointClass qclass = (DnsEndpointClass)BinaryPrimitives.ReadUInt16BigEndian(span[(bytesConsumed + 2)..]);
-                    int ttl = BinaryPrimitives.ReadInt32BigEndian(span[(bytesConsumed + 4)..]);
-                    ushort rdlength = BinaryPrimitives.ReadUInt16BigEndian(span[(bytesConsumed + 8)..]);
-                    bytesConsumed += 10;
+                    string name = context.ReadDomainName();
+                    DomainType qtype = (DomainType)context.ReadUInt16();
+                    DnsEndpointClass qclass = (DnsEndpointClass)context.ReadUInt16();
+                    int ttl = context.ReadInt32();
+                    ushort rdlength = context.ReadUInt16();
 
                     record = qtype switch
                     {
@@ -106,8 +67,8 @@ namespace Meowtrix.FDns
                     record.Type = qtype;
                     record.EndpointClass = qclass;
                     record.AliveSeconds = ttl;
-                    record.ReadData(span.Slice(bytesConsumed, rdlength));
-                    bytesConsumed += rdlength;
+                    record.ReadData(context.AvailableSpan[..rdlength]);
+                    context.BytesConsumed += rdlength;
                 }
 
                 return result;
@@ -116,18 +77,18 @@ namespace Meowtrix.FDns
             var queries = queryCount == 0 ? Array.Empty<DnsQuery>() : new DnsQuery[queryCount];
             foreach (ref var query in queries.AsSpan())
             {
-                string name = ParseName(span, bytesConsumed, out int nameConsumed);
-                bytesConsumed += nameConsumed;
-                DomainType qtype = (DomainType)BinaryPrimitives.ReadUInt16BigEndian(span[bytesConsumed..]);
-                DnsEndpointClass qclass = (DnsEndpointClass)BinaryPrimitives.ReadUInt16BigEndian(span[(bytesConsumed + 2)..]);
-                bytesConsumed += 4;
+                string name = context.ReadDomainName();
+                DomainType qtype = (DomainType)context.ReadUInt16();
+                DnsEndpointClass qclass = (DnsEndpointClass)context.ReadUInt16();
                 query = new(name, qtype, qclass);
             }
 
             message.Queries = queries;
-            message.Answers = ParseSection(span, answerCount, ref bytesConsumed);
-            message.NameServerAuthorities = ParseSection(span, serverCount, ref bytesConsumed);
-            message.AdditionalRecords = ParseSection(span, additionalCount, ref bytesConsumed);
+            message.Answers = ParseSection(ref context, answerCount);
+            message.NameServerAuthorities = ParseSection(ref context, serverCount);
+            message.AdditionalRecords = ParseSection(ref context, additionalCount);
+
+            bytesConsumed = context.BytesConsumed;
             return message;
         }
 
@@ -211,7 +172,7 @@ namespace Meowtrix.FDns
                 return totalBytesWritten + 1;
             }
 
-            BinaryPrimitives.WriteInt16BigEndian(destination, message.QueryId);
+            BinaryPrimitives.WriteUInt16BigEndian(destination, message.QueryId);
 
             ushort flags = 0;
             if (message.IsResponse)
@@ -269,6 +230,73 @@ namespace Meowtrix.FDns
             bytesWritten += FormatSection(message.NameServerAuthorities, destination[bytesWritten..], bytesWritten);
             bytesWritten += FormatSection(message.AdditionalRecords, destination[bytesWritten..], bytesWritten);
             return bytesWritten;
+        }
+
+        internal ref struct DnsParseContext
+        {
+            private readonly ReadOnlySpan<byte> _span;
+            public int BytesConsumed { get; set; }
+            public ReadOnlySpan<byte> AvailableSpan => _span[BytesConsumed..];
+
+            public DnsParseContext(ReadOnlySpan<byte> span)
+            {
+                _span = span;
+                BytesConsumed = 0;
+            }
+
+            public ushort ReadUInt16()
+            {
+                ushort result = BinaryPrimitives.ReadUInt16BigEndian(AvailableSpan);
+                BytesConsumed += 2;
+                return result;
+            }
+
+            public int ReadInt32()
+            {
+                int result = BinaryPrimitives.ReadInt32BigEndian(AvailableSpan);
+                BytesConsumed += 4;
+                return result;
+            }
+
+            public string ReadDomainName()
+            {
+                int position = BytesConsumed;
+                Span<char> buffer = stackalloc char[256];
+                int bufferIndex = 0;
+                int bytesConsumed = 0;
+                bool jumped = false;
+
+                while (true)
+                {
+                    byte length = _span[position];
+                    if ((length & 0b_1100_0000) != 0)
+                    {
+                        position = length & 0b_0011_1111;
+                        jumped = true;
+                        bytesConsumed++;
+                        continue;
+                    }
+
+                    if (!jumped)
+                        bytesConsumed += length + 1;
+
+                    if (length == 0)
+                        break;
+
+                    if (bufferIndex > 0)
+                        buffer[bufferIndex++] = '.';
+
+                    var nameSpan = _span.Slice(position + 1, length);
+                    int charsWritten = nameSpan.StartsWith(IDNAPrefix)
+                        ? PunyCode.DecodeFromAscii(nameSpan[IDNAPrefix.Length..], buffer[bufferIndex..])
+                        : Encoding.ASCII.GetChars(nameSpan, buffer[bufferIndex..]);
+                    bufferIndex += charsWritten;
+                    position = position + 1 + length;
+                }
+
+                BytesConsumed += bytesConsumed;
+                return new string(buffer[..bufferIndex]);
+            }
         }
     }
 }

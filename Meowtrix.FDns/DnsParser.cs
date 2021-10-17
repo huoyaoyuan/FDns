@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Meowtrix.FDns.Records;
 
@@ -130,13 +131,39 @@ namespace Meowtrix.FDns
             return message;
         }
 
-        public static int FormatMessage(DnsMessage message, Span<byte> destination)
+        public static int FormatMessage(DnsMessage message, Span<byte> destination, bool enableNameCompression = false)
         {
-            static int FormatName(ReadOnlySpan<char> name, Span<byte> destination)
+            List<(int Index, string String)>? savedString = null;
+            if (enableNameCompression)
+                savedString = new();
+
+            int FormatName(ReadOnlySpan<char> name, Span<byte> destination, int startIndex)
             {
                 int totalBytesWritten = 0;
                 while (!name.IsEmpty)
                 {
+                    if (savedString != null)
+                    {
+                        // Compression
+                        foreach (var (index, saved) in savedString)
+                        {
+                            if (name.SequenceEqual(saved))
+                            {
+                                Debug.Assert(index <= 0b_0011_1111);
+
+                                destination[0] = checked((byte)(0b_1100_0000 | index));
+                                return totalBytesWritten + 1;
+                            }
+                        }
+
+                        // Save for compression
+                        int current = startIndex + totalBytesWritten;
+                        if (current <= 0b_0011_1111)
+                        {
+                            savedString.Add((current, name.ToString()));
+                        }
+                    }
+
                     int delimiterIndex = name.IndexOf('.');
                     ReadOnlySpan<char> section;
                     if (delimiterIndex != -1)
@@ -206,7 +233,7 @@ namespace Meowtrix.FDns
             BinaryPrimitives.WriteUInt16BigEndian(destination[10..], checked((ushort)(message.AdditionalRecords?.Count ?? 0)));
             int bytesWritten = 12;
 
-            static int FormatSection(IReadOnlyList<DnsResourceRecord>? secton, Span<byte> destination)
+            int FormatSection(IReadOnlyList<DnsResourceRecord>? secton, Span<byte> destination, int startIndex)
             {
                 if (secton is null)
                     return 0;
@@ -217,7 +244,8 @@ namespace Meowtrix.FDns
                 {
                     bytesWritten += FormatName(
                         record.Name ?? throw new InvalidOperationException("RR must have name"),
-                        destination[bytesWritten..]);
+                        destination[bytesWritten..],
+                        startIndex + bytesWritten);
                     BinaryPrimitives.WriteUInt16BigEndian(destination[bytesWritten..], (ushort)record.Type);
                     BinaryPrimitives.WriteUInt16BigEndian(destination[(bytesWritten + 2)..], (ushort)record.EndpointClass);
                     BinaryPrimitives.WriteInt32BigEndian(destination[(bytesWritten + 4)..], record.AliveSeconds);
@@ -231,15 +259,15 @@ namespace Meowtrix.FDns
 
             foreach (var query in message.Queries)
             {
-                bytesWritten += FormatName(query.QueryName, destination[bytesWritten..]);
+                bytesWritten += FormatName(query.QueryName, destination[bytesWritten..], bytesWritten);
                 BinaryPrimitives.WriteUInt16BigEndian(destination[bytesWritten..], (ushort)query.QueryType);
                 BinaryPrimitives.WriteUInt16BigEndian(destination[(bytesWritten + 2)..], (ushort)query.QueryClass);
                 bytesWritten += 4;
             }
 
-            bytesWritten += FormatSection(message.Answers, destination[bytesWritten..]);
-            bytesWritten += FormatSection(message.NameServerAuthorities, destination[bytesWritten..]);
-            bytesWritten += FormatSection(message.AdditionalRecords, destination[bytesWritten..]);
+            bytesWritten += FormatSection(message.Answers, destination[bytesWritten..], bytesWritten);
+            bytesWritten += FormatSection(message.NameServerAuthorities, destination[bytesWritten..], bytesWritten);
+            bytesWritten += FormatSection(message.AdditionalRecords, destination[bytesWritten..], bytesWritten);
             return bytesWritten;
         }
     }

@@ -118,6 +118,29 @@ namespace Meowtrix.FDns.UnitTests
         }
 
         [Fact]
+        public void NamePointerFormatting()
+        {
+            var message = new DnsMessage()
+            {
+                Queries = new[]
+                {
+                    new DnsQuery("example.com", DomainType.A, DnsEndpointClass.IN),
+                    new DnsQuery("www.example.com", DomainType.A, DnsEndpointClass.IN),
+                    new DnsQuery("com", DomainType.A, DnsEndpointClass.IN),
+                }
+            };
+
+            byte[] buffer = new byte[1024];
+            int bytesWritten = DnsParser.FormatMessage(message, buffer, enableNameCompression: true);
+            var message2 = DnsParser.ParseMessage(buffer.AsSpan(0, bytesWritten), out int bytesConsumed);
+            Assert.Equal(bytesWritten, bytesConsumed);
+            Assert.Equal(3, message2.Queries.Count);
+            Assert.Equal("example.com", message2.Queries[0].QueryName);
+            Assert.Equal("www.example.com", message2.Queries[1].QueryName);
+            Assert.Equal("com", message2.Queries[2].QueryName);
+        }
+
+        [Fact]
         public void UnicodeDomainName()
         {
             byte[] packet = new byte[]

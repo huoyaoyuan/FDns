@@ -1,11 +1,18 @@
-﻿namespace Meowtrix.FDns.Records
+﻿using System;
+
+namespace Meowtrix.FDns.Records
 {
     public class DomainNameRecord : DnsResourceRecord
     {
         public string? TargetDomainName { get; set; }
 
         internal override void ReadData(ref DnsParser.DnsParseContext context, int length)
-            => TargetDomainName = context.ReadDomainName();
+        {
+            int original = context.BytesConsumed;
+            TargetDomainName = context.ReadDomainName();
+            if (context.BytesConsumed - original != length)
+                throw new InvalidOperationException("RR data length overrun.");
+        }
 
         internal override int WriteData(ref DnsParser.DnsFormatContext context)
         {

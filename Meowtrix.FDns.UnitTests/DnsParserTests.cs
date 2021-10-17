@@ -288,5 +288,44 @@ namespace Meowtrix.FDns.UnitTests
             var record = Assert.IsType<DomainNameRecord>(message.Answers[0]);
             Assert.Equal("www.example.com", record.TargetDomainName);
         }
+
+        [Fact]
+        public void NamePointerOverflow()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                1, (byte)'a', 2, (byte)'b', (byte) 'c', 0b_1100_0000 + 18,
+            };
+            Assert.Throws<IndexOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));
+        }
+
+        [Fact]
+        public void NameOverRunInRR()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0x80, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
+                3, (byte)'c', (byte)'o', (byte)'m', 0,
+                0, 5, 0, 1, 0, 0, 0x12, 0x34, 0, 1,
+                3, (byte)'w', (byte)'w', (byte)'w', 0,
+            };
+            Assert.Throws<InvalidOperationException>(() => DnsParser.ParseMessage(packet, out _));
+        }
+
+        [Fact]
+        public void RecursivePointer()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
+                1, (byte)'a', 2, (byte)'b', (byte) 'c', 0b_1100_0000 + 22,
+                0, 1, 0, 1,
+                3, (byte)'c', (byte)'o', (byte)'m', 0b_1100_0000 + 14,
+                0, 1, 0, 1,
+            };
+            Assert.Throws<IndexOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));
+        }
     }
 }

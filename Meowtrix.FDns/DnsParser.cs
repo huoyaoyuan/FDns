@@ -9,6 +9,9 @@ namespace Meowtrix.FDns
 {
     public static class DnsParser
     {
+        // https://datatracker.ietf.org/doc/html/rfc1035
+
+        // IDNA: https://datatracker.ietf.org/doc/html/rfc5891#section-4.4
         public static ReadOnlySpan<byte> IDNAPrefix
             => new byte[] { (byte)'x', (byte)'n', (byte)'-', (byte)'-' };
 

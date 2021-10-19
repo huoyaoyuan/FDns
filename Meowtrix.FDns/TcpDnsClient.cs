@@ -24,7 +24,7 @@ namespace Meowtrix.FDns
 
         public async ValueTask<DnsMessage> QueryAsync(DnsMessage queryMessage, CancellationToken cancellationToken = default)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(2048);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
             try
             {
                 using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

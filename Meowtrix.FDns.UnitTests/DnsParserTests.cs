@@ -327,5 +327,30 @@ namespace Meowtrix.FDns.UnitTests
             };
             Assert.Throws<IndexOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));
         }
+
+        [Fact]
+        public void RealLifeTest()
+        {
+            byte[] packet = new byte[]
+            {
+                0, 0, 128, 128, 0, 1, 0, 1, 0, 0,
+                0, 0, 3, 119, 119, 119, 5, 98, 97, 105,
+                100, 117, 3, 99, 111, 109, 0, 0, 255, 0,
+                1, 192, 12, 0, 5, 0, 1, 0, 0, 0,
+                27, 0, 18, 3, 119, 119, 119, 1, 97, 6,
+                115, 104, 105, 102, 101, 110, 3, 99, 111, 109,
+                0,
+            };
+            var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
+            Assert.Equal(packet.Length, bytesConsumed);
+
+            Assert.True(message.IsResponse);
+            Assert.Equal(1, message.Queries.Count);
+            Assert.Equal(1, message.Answers.Count);
+            Assert.Equal("www.baidu.com", message.Answers[0].Name);
+            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            var cname = Assert.IsType<DomainNameRecord>(message.Answers[0]);
+            Assert.Equal("www.a.shifen.com", cname.TargetDomainName);
+        }
     }
 }

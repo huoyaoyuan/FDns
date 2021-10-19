@@ -191,9 +191,9 @@ namespace Meowtrix.FDns
                     byte length = _span[position];
                     if ((length & 0b_1100_0000) != 0)
                     {
-                        position = length & 0b_0011_1111;
+                        position = BinaryPrimitives.ReadUInt16BigEndian(_span[position..]) & 0x3FFF;
                         jumped = true;
-                        bytesConsumed++;
+                        bytesConsumed += 2;
                         continue;
                     }
 

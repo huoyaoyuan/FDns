@@ -23,7 +23,7 @@ while (true)
     {
         Queries = new[]
         {
-            new DnsQuery(domainName, DomainType.QueryAll, DnsEndpointClass.IN)
+            new DnsQuery(domainName, DnsRecordType.QueryAll, DnsEndpointClass.IN)
         }
     };
 
@@ -45,7 +45,7 @@ while (true)
                 Console.WriteLine(answer switch
                 {
                     IPRecord ip => $"Address: {ip.Address}",
-                    DomainNameRecord { Type: DomainType.CNAME } cname => $"Alias of: {cname.TargetDomainName}",
+                    DomainNameRecord { Type: DnsRecordType.CNAME } cname => $"Alias of: {cname.TargetDomainName}",
                     MXRecord mx => $"Preference: {mx.PreferenceOrder}, Mail server: {mx.MailServerDomainName}",
                     TxtRecord txt => $"Text data: {txt.Text}",
                     SoaRecord soa => $"SOA Zone: {soa.ZoneName}",

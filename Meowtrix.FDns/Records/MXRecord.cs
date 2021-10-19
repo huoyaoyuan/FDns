@@ -2,7 +2,7 @@
 
 namespace Meowtrix.FDns.Records
 {
-    public class MXRecord : DnsResourceRecord
+    public record class MXRecord : DnsResourceRecord
     {
         public int PreferenceOrder { get; set; }
         public string? MailServerDomainName { get; set; }

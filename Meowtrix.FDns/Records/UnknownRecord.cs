@@ -2,7 +2,7 @@
 
 namespace Meowtrix.FDns.Records
 {
-    public class UnknownRecord : NormalRecord
+    public record class UnknownRecord : NormalRecord
     {
         public ReadOnlyMemory<byte> Data { get; set; }
 

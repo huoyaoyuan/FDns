@@ -55,18 +55,18 @@ namespace Meowtrix.FDns
                 foreach (ref var record in result.AsSpan())
                 {
                     string name = context.ReadDomainName();
-                    DomainType qtype = (DomainType)context.ReadUInt16();
+                    DnsRecordType qtype = (DnsRecordType)context.ReadUInt16();
                     DnsEndpointClass qclass = (DnsEndpointClass)context.ReadUInt16();
                     int ttl = context.ReadInt32();
                     ushort rdlength = context.ReadUInt16();
 
                     record = qtype switch
                     {
-                        DomainType.A or DomainType.AAAA => new IPRecord(),
-                        DomainType.TXT => new TxtRecord(),
-                        DomainType.CNAME => new DomainNameRecord(),
-                        DomainType.MX => new MXRecord(),
-                        DomainType.SOA => new SoaRecord(),
+                        DnsRecordType.A or DnsRecordType.AAAA => new IPRecord(),
+                        DnsRecordType.TXT => new TxtRecord(),
+                        DnsRecordType.CNAME => new DomainNameRecord(),
+                        DnsRecordType.MX => new MXRecord(),
+                        DnsRecordType.SOA => new SoaRecord(),
                         _ => new UnknownRecord()
                     };
                     record.Name = name;
@@ -84,7 +84,7 @@ namespace Meowtrix.FDns
             foreach (ref var query in queries.AsSpan())
             {
                 string name = context.ReadDomainName();
-                DomainType qtype = (DomainType)context.ReadUInt16();
+                DnsRecordType qtype = (DnsRecordType)context.ReadUInt16();
                 DnsEndpointClass qclass = (DnsEndpointClass)context.ReadUInt16();
                 query = new(name, qtype, qclass);
             }

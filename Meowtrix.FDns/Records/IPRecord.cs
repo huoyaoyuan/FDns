@@ -3,7 +3,7 @@ using System.Net;
 
 namespace Meowtrix.FDns.Records
 {
-    public class IPRecord : NormalRecord
+    public record class IPRecord : NormalRecord
     {
         public IPAddress? Address { get; set; }
 

@@ -86,7 +86,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.Equal(1, message.Queries.Count);
             Assert.Equal("a.bc", message.Queries[0].QueryName);
-            Assert.Equal(DomainType.A, message.Queries[0].QueryType);
+            Assert.Equal(DnsRecordType.A, message.Queries[0].QueryType);
             Assert.Equal(DnsEndpointClass.IN, message.Queries[0].QueryClass);
 
             TestFormatRoundTrip(packet, message);
@@ -124,9 +124,9 @@ namespace Meowtrix.FDns.UnitTests
             {
                 Queries = new[]
                 {
-                    new DnsQuery("example.com", DomainType.A, DnsEndpointClass.IN),
-                    new DnsQuery("www.example.com", DomainType.A, DnsEndpointClass.IN),
-                    new DnsQuery("com", DomainType.A, DnsEndpointClass.IN),
+                    new DnsQuery("example.com", DnsRecordType.A, DnsEndpointClass.IN),
+                    new DnsQuery("www.example.com", DnsRecordType.A, DnsEndpointClass.IN),
+                    new DnsQuery("com", DnsRecordType.A, DnsEndpointClass.IN),
                 }
             };
 
@@ -176,7 +176,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.True(message.IsResponse);
             Assert.Equal(1, message.Answers.Count);
-            Assert.Equal(DomainType.A, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.A, message.Answers[0].Type);
             Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<IPRecord>(message.Answers[0]);
@@ -203,7 +203,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.True(message.IsResponse);
             Assert.Equal(1, message.Answers.Count);
-            Assert.Equal(DomainType.AAAA, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.AAAA, message.Answers[0].Type);
             Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<IPRecord>(message.Answers[0]);
@@ -230,7 +230,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.True(message.IsResponse);
             Assert.Equal(1, message.Answers.Count);
-            Assert.Equal(DomainType.TXT, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.TXT, message.Answers[0].Type);
             Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<TxtRecord>(message.Answers[0]);
@@ -257,7 +257,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.True(message.IsResponse);
             Assert.Equal(1, message.Answers.Count);
-            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.CNAME, message.Answers[0].Type);
             Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<DomainNameRecord>(message.Answers[0]);
@@ -282,7 +282,7 @@ namespace Meowtrix.FDns.UnitTests
 
             Assert.True(message.IsResponse);
             Assert.Equal(1, message.Answers.Count);
-            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.CNAME, message.Answers[0].Type);
             Assert.Equal(DnsEndpointClass.IN, message.Answers[0].EndpointClass);
             Assert.Equal(0x1234, message.Answers[0].AliveSeconds);
             var record = Assert.IsType<DomainNameRecord>(message.Answers[0]);
@@ -348,7 +348,7 @@ namespace Meowtrix.FDns.UnitTests
             Assert.Equal(1, message.Queries.Count);
             Assert.Equal(1, message.Answers.Count);
             Assert.Equal("www.baidu.com", message.Answers[0].Name);
-            Assert.Equal(DomainType.CNAME, message.Answers[0].Type);
+            Assert.Equal(DnsRecordType.CNAME, message.Answers[0].Type);
             var cname = Assert.IsType<DomainNameRecord>(message.Answers[0]);
             Assert.Equal("www.a.shifen.com", cname.TargetDomainName);
         }

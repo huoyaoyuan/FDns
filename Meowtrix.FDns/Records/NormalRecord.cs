@@ -2,7 +2,7 @@
 
 namespace Meowtrix.FDns.Records
 {
-    public abstract class NormalRecord : DnsResourceRecord
+    public abstract record class NormalRecord : DnsResourceRecord
     {
         internal sealed override void ReadData(ref DnsParser.DnsParseContext context, int length)
         {

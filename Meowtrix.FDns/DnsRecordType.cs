@@ -4,7 +4,7 @@
     // https://datatracker.ietf.org/doc/html/rfc3596#section-2.1
     // List of types: https://en.wikipedia.org/wiki/List_of_DNS_record_types
 
-    public enum DomainType : short
+    public enum DnsRecordType : short
     {
         /// <summary>
         /// host address

@@ -2,7 +2,7 @@
 
 namespace Meowtrix.FDns.Records
 {
-    public class DomainNameRecord : DnsResourceRecord
+    public record class DomainNameRecord : DnsResourceRecord
     {
         public string? TargetDomainName { get; set; }
 

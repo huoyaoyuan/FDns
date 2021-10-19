@@ -2,7 +2,7 @@
 
 namespace Meowtrix.FDns.Records
 {
-    public class SoaRecord : DnsResourceRecord
+    public record class SoaRecord : DnsResourceRecord
     {
         public string? ZoneName { get; set; }
         public string? MailBoxName { get; set; }

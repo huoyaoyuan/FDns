@@ -39,13 +39,13 @@ namespace Meowtrix.FDns
 
     public record class DnsQuery(
         string QueryName,
-        DomainType QueryType,
+        DnsRecordType QueryType,
         DnsEndpointClass QueryClass);
 
-    public abstract class DnsResourceRecord
+    public abstract record class DnsResourceRecord
     {
         public string? Name { get; set; }
-        public DomainType Type { get; set; }
+        public DnsRecordType Type { get; set; }
         public DnsEndpointClass EndpointClass { get; set; }
         public int AliveSeconds { get; set; }
 

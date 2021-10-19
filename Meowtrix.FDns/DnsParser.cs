@@ -65,6 +65,8 @@ namespace Meowtrix.FDns
                         DomainType.A or DomainType.AAAA => new IPRecord(),
                         DomainType.TXT => new TxtRecord(),
                         DomainType.CNAME => new DomainNameRecord(),
+                        DomainType.MX => new MXRecord(),
+                        DomainType.SOA => new SoaRecord(),
                         _ => new UnknownRecord()
                     };
                     record.Name = name;
@@ -171,6 +173,20 @@ namespace Meowtrix.FDns
                 return result;
             }
 
+            public short ReadInt16()
+            {
+                short result = BinaryPrimitives.ReadInt16BigEndian(AvailableSpan);
+                BytesConsumed += 2;
+                return result;
+            }
+
+            public uint ReadUInt32()
+            {
+                uint result = BinaryPrimitives.ReadUInt32BigEndian(AvailableSpan);
+                BytesConsumed += 4;
+                return result;
+            }
+
             public int ReadInt32()
             {
                 int result = BinaryPrimitives.ReadInt32BigEndian(AvailableSpan);
@@ -237,6 +253,18 @@ namespace Meowtrix.FDns
             {
                 BinaryPrimitives.WriteUInt16BigEndian(AvailableSpan, value);
                 BytesWritten += 2;
+            }
+
+            public void WriteInt16(short value)
+            {
+                BinaryPrimitives.WriteInt16BigEndian(AvailableSpan, value);
+                BytesWritten += 2;
+            }
+
+            public void WriteUInt32(uint value)
+            {
+                BinaryPrimitives.WriteUInt32BigEndian(AvailableSpan, value);
+                BytesWritten += 4;
             }
 
             public void WriteInt32(int value)

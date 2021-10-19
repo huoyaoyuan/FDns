@@ -16,5 +16,13 @@
         /// Hesiod
         /// </summary>
         HS = 4,
+
+        /// <summary>
+        /// Querying all classes
+        /// </summary>
+        /// <remarks>
+        /// This value is only valid in a query.
+        /// </remarks>
+        QueryAll = 255,
     }
 }

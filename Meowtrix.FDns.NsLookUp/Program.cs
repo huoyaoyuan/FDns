@@ -7,7 +7,7 @@ IPAddress? serverAddress;
 
 while (true)
 {
-    Console.Write("DNS Server ip:");
+    Console.Write("DNS Server ip: ");
     if (IPAddress.TryParse(Console.ReadLine(), out serverAddress))
         break;
     Console.WriteLine("Can't parse ip.");
@@ -23,7 +23,7 @@ while (true)
     {
         Queries = new[]
         {
-            new DnsQuery(domainName, (DomainType)255, DnsEndpointClass.IN)
+            new DnsQuery(domainName, DomainType.QueryAll, DnsEndpointClass.IN)
         }
     };
 
@@ -40,12 +40,15 @@ while (true)
             {
                 Console.WriteLine($"Domain: {answer.Name}");
                 Console.WriteLine($"Type: {answer.Type}");
+                Console.WriteLine($"TTL: {TimeSpan.FromSeconds(answer.AliveSeconds)} ({answer.AliveSeconds}s)");
 
                 Console.WriteLine(answer switch
                 {
-                    IPRecord ip => $"Address: {ip}",
+                    IPRecord ip => $"Address: {ip.Address}",
                     DomainNameRecord { Type: DomainType.CNAME } cname => $"Alias of: {cname.TargetDomainName}",
+                    MXRecord mx => $"Preference: {mx.PreferenceOrder}, Mail server: {mx.MailServerDomainName}",
                     TxtRecord txt => $"Text data: {txt.Text}",
+                    SoaRecord soa => $"SOA Zone: {soa.ZoneName}",
                     _ => "Unknown data"
                 });
 

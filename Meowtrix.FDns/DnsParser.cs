@@ -189,7 +189,7 @@ namespace Meowtrix.FDns
                 while (true)
                 {
                     byte length = _span[position];
-                    if ((length & 0b_1100_0000) != 0)
+                    if ((length & 0xC0) != 0)
                     {
                         position = BinaryPrimitives.ReadUInt16BigEndian(_span[position..]) & 0x3FFF;
                         jumped = true;
@@ -256,17 +256,17 @@ namespace Meowtrix.FDns
                         {
                             if (name.SequenceEqual(saved))
                             {
-                                Debug.Assert(index <= 0b_0011_1111);
+                                Debug.Assert(index <= 0x3FFF);
 
-                                AvailableSpan[0] = checked((byte)(0b_1100_0000 | index));
-                                BytesWritten++;
+                                BinaryPrimitives.WriteUInt16BigEndian(AvailableSpan, checked((ushort)(0xC000 | index)));
+                                BytesWritten += 2;
                                 return;
                             }
                         }
 
                         // Save for compression
                         int current = BytesWritten;
-                        if (current <= 0b_0011_1111)
+                        if (current <= 0x3FFF)
                         {
                             _savedString.Add((current, name.ToString()));
                         }

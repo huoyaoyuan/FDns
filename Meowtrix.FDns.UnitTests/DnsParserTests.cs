@@ -100,7 +100,7 @@ namespace Meowtrix.FDns.UnitTests
                 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
                 1, (byte)'a', 2, (byte)'b', (byte) 'c', 0,
                 0, 1, 0, 1,
-                0b_1100_0000 + 14,
+                192, 14,
                 0, 1, 0, 1,
                 7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
                 3, (byte)'c', (byte)'o', (byte)'m', 0,
@@ -274,8 +274,8 @@ namespace Meowtrix.FDns.UnitTests
                 0, 0, 0x80, 0, 0, 0, 0, 1, 0, 0, 0, 0,
                 7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e',
                 3, (byte)'c', (byte)'o', (byte)'m', 0,
-                0, 5, 0, 1, 0, 0, 0x12, 0x34, 0, 5,
-                3, (byte)'w', (byte)'w', (byte)'w', 0b_1100_0000 + 12,
+                0, 5, 0, 1, 0, 0, 0x12, 0x34, 0, 6,
+                3, (byte)'w', (byte)'w', (byte)'w', 192, 12,
             };
             var message = DnsParser.ParseMessage(packet, out int bytesConsumed);
             Assert.Equal(packet.Length, bytesConsumed);
@@ -295,9 +295,9 @@ namespace Meowtrix.FDns.UnitTests
             byte[] packet = new byte[]
             {
                 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-                1, (byte)'a', 2, (byte)'b', (byte) 'c', 0b_1100_0000 + 18,
+                1, (byte)'a', 2, (byte)'b', (byte) 'c', 192, 18,
             };
-            Assert.Throws<IndexOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));
+            Assert.Throws<ArgumentOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));
         }
 
         [Fact]
@@ -320,9 +320,9 @@ namespace Meowtrix.FDns.UnitTests
             byte[] packet = new byte[]
             {
                 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
-                1, (byte)'a', 2, (byte)'b', (byte) 'c', 0b_1100_0000 + 22,
+                1, (byte)'a', 2, (byte)'b', (byte) 'c', 192, 22,
                 0, 1, 0, 1,
-                3, (byte)'c', (byte)'o', (byte)'m', 0b_1100_0000 + 14,
+                3, (byte)'c', (byte)'o', (byte)'m', 192, 14,
                 0, 1, 0, 1,
             };
             Assert.Throws<IndexOutOfRangeException>(() => DnsParser.ParseMessage(packet, out _));

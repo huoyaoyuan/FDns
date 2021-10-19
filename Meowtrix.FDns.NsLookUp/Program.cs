@@ -13,7 +13,9 @@ while (true)
     Console.WriteLine("Can't parse ip.");
 }
 
-var client = new TcpDnsClient(serverAddress);
+Console.Write("Use [TCP] or UDP?: ");
+bool useUdp = Console.ReadLine()!.StartsWith("U", StringComparison.OrdinalIgnoreCase);
+Console.WriteLine(useUdp ? "Using UDP." : "Using TCP.");
 
 while (true)
 {
@@ -29,7 +31,7 @@ while (true)
 
     try
     {
-        var response = await client.QueryAsync(message);
+        var response = await (useUdp ? new UdpDnsClient(serverAddress).QueryAsync(message) : new TcpDnsClient(serverAddress).QueryAsync(message));
         if (response.Answers is null or { Count: 0 })
         {
             Console.WriteLine("The server does not return any response");

@@ -1,21 +1,82 @@
 ﻿using System;
 using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Meowtrix.FDns;
 using Meowtrix.FDns.Records;
 
-IPAddress? serverAddress;
+Func<DnsMessage, ValueTask<DnsMessage>> queryMethod;
 
-while (true)
+Console.Write("Choose DNS method: [T]CP / [U]DP / HTTP [G]ET / HTTP [P]OST: ");
+switch (Console.ReadLine()![0])
 {
-    Console.Write("DNS Server ip: ");
-    if (IPAddress.TryParse(Console.ReadLine(), out serverAddress))
-        break;
-    Console.WriteLine("Can't parse ip.");
-}
+    case 'G' or 'g':
+    {
+        Console.WriteLine("Using HTTP GET.");
 
-Console.Write("Use [TCP] or UDP?: ");
-bool useUdp = Console.ReadLine()!.StartsWith("U", StringComparison.OrdinalIgnoreCase);
-Console.WriteLine(useUdp ? "Using UDP." : "Using TCP.");
+        Uri? serverUri;
+        while (true)
+        {
+            Console.Write("Server url: ");
+            if (Uri.TryCreate(Console.ReadLine(), UriKind.Absolute, out serverUri)
+                && serverUri.Scheme is "http" or "https")
+                break;
+            Console.WriteLine("Can't parse server url.");
+        }
+        var client = new HttpsDnsClient(serverUri);
+        queryMethod = m => client.QueryAsync(m, HttpMethod.Get);
+        break;
+    }
+    case 'P' or 'p':
+    {
+        Console.WriteLine("Using HTTP POST.");
+
+        Uri? serverUri;
+        while (true)
+        {
+            Console.Write("Server url: ");
+            if (Uri.TryCreate(Console.ReadLine(), UriKind.Absolute, out serverUri)
+                && serverUri.Scheme is "http" or "https")
+                break;
+            Console.WriteLine("Can't parse server url.");
+        }
+        var client = new HttpsDnsClient(serverUri);
+        queryMethod = m => client.QueryAsync(m, HttpMethod.Post);
+        break;
+    }
+    case 'U' or 'u':
+    {
+        Console.WriteLine("Using UDP.");
+
+        IPAddress? serverAddress;
+        while (true)
+        {
+            Console.Write("DNS Server ip: ");
+            if (IPAddress.TryParse(Console.ReadLine(), out serverAddress))
+                break;
+            Console.WriteLine("Can't parse ip.");
+        }
+        var client = new UdpDnsClient(serverAddress);
+        queryMethod = m => client.QueryAsync(m);
+        break;
+    }
+    default:
+    {
+        Console.WriteLine("Using TCP.");
+
+        IPAddress? serverAddress;
+        while (true)
+        {
+            Console.Write("DNS Server ip: ");
+            if (IPAddress.TryParse(Console.ReadLine(), out serverAddress))
+                break;
+            Console.WriteLine("Can't parse ip.");
+        }
+        var client = new TcpDnsClient(serverAddress);
+        queryMethod = m => client.QueryAsync(m);
+        break;
+    }
+}
 
 while (true)
 {
@@ -31,7 +92,9 @@ while (true)
 
     try
     {
-        var response = await (useUdp ? new UdpDnsClient(serverAddress).QueryAsync(message) : new TcpDnsClient(serverAddress).QueryAsync(message));
+        var response = await queryMethod(message);
+
+        Console.WriteLine($"Response code: {response.ResponseCode}");
         if (response.Answers is null or { Count: 0 })
         {
             Console.WriteLine("The server does not return any response");
